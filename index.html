@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>術中輸血與補液估算器</title>
+  <meta name="theme-color" content="#b4492e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Transfusion Calc">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="術中 Hb、MABL、輸血與補液即時計算器">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/app-icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Intraop Estimator</p>
+        <h1>術中 Hb、輸血與補液估算器</h1>
+        <p class="hero-copy">
+          依病人體型、失血、尿量、術式與已輸血量，快速估算目前 Hb、尚需 PRBC 與累積補液量。
+        </p>
+      </div>
+      <div class="notice">
+        <strong>注意</strong>
+        <p>此工具僅供術中快速估算，不可取代即時檢驗、hemodynamics、ABG 與臨床判斷。</p>
+      </div>
+    </section>
+
+    <section class="grid">
+      <form id="calculator" class="panel panel-form">
+        <div class="section-title">
+          <h2>病人與術中資料</h2>
+          <p>輸入數值後即時計算</p>
+        </div>
+
+        <div class="field-grid">
+          <label class="field">
+            <span>性別</span>
+            <select id="sex">
+              <option value="male">男</option>
+              <option value="female">女</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>身高</span>
+            <div class="input-wrap">
+              <input id="heightCm" type="number" min="100" max="230" step="0.1" value="170">
+              <em>cm</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>體重</span>
+            <div class="input-wrap">
+              <input id="weightKg" type="number" min="20" max="250" step="0.1" value="70">
+              <em>kg</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>手術開始時間</span>
+            <input id="startTime" type="datetime-local">
+          </label>
+
+          <label class="field">
+            <span>目前時間</span>
+            <div class="readonly-card">
+              <strong id="currentTimeDisplay">--</strong>
+              <small id="durationDisplay">經過 0.0 hr</small>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>術式等級</span>
+            <select id="surgeryLevel">
+              <option value="2">輕度 exposed / minor (2 mL/kg/hr)</option>
+              <option value="4" selected>中度 tissue trauma / moderate (4 mL/kg/hr)</option>
+              <option value="6">重度 major abdominal/thoracic (6 mL/kg/hr)</option>
+              <option value="8">極大 trauma / extensive (8 mL/kg/hr)</option>
+              <option value="custom">自訂</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>自訂 insensible loss</span>
+            <div class="input-wrap">
+              <input id="customInsensible" type="number" min="0" max="20" step="0.1" value="4">
+              <em>mL/kg/hr</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>最新 Hb</span>
+            <div class="input-wrap">
+              <input id="latestHb" type="number" min="1" max="25" step="0.1" value="10">
+              <em>g/dL</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>目標 Hb</span>
+            <div class="input-wrap">
+              <input id="targetHb" type="number" min="1" max="25" step="0.1" value="8">
+              <em>g/dL</em>
+            </div>
+          </label>
+
+        </div>
+
+        <div class="section-title assumptions-title">
+          <h2>即時術中更新</h2>
+          <p>滑動或點按微調，適合邊做邊更新</p>
+        </div>
+
+        <div class="dial-grid">
+          <label class="dial-field">
+            <span>累積 blood loss</span>
+            <input id="bloodLossMl" class="dial" type="range" min="0" max="15000" step="10" value="800">
+            <div class="dial-meta">
+              <button type="button" class="stepper" data-target="bloodLossMl" data-step="-50">-</button>
+              <strong id="bloodLossMlValue">800 mL</strong>
+              <button type="button" class="stepper" data-target="bloodLossMl" data-step="50">+</button>
+            </div>
+          </label>
+
+          <label class="dial-field">
+            <span>累積 urine output</span>
+            <input id="urineOutputMl" class="dial" type="range" min="0" max="10000" step="10" value="300">
+            <div class="dial-meta">
+              <button type="button" class="stepper" data-target="urineOutputMl" data-step="-50">-</button>
+              <strong id="urineOutputMlValue">300 mL</strong>
+              <button type="button" class="stepper" data-target="urineOutputMl" data-step="50">+</button>
+            </div>
+          </label>
+
+          <label class="dial-field">
+            <span>已輸 PRBC</span>
+            <input id="prbcUnits" class="dial" type="range" min="0" max="20" step="0.5" value="0">
+            <div class="dial-meta">
+              <button type="button" class="stepper" data-target="prbcUnits" data-step="-0.5">-</button>
+              <strong id="prbcUnitsValue">0.0 unit</strong>
+              <button type="button" class="stepper" data-target="prbcUnits" data-step="0.5">+</button>
+            </div>
+          </label>
+
+          <label class="dial-field">
+            <span>已輸 FFP</span>
+            <input id="ffpUnits" class="dial" type="range" min="0" max="20" step="0.5" value="0">
+            <div class="dial-meta">
+              <button type="button" class="stepper" data-target="ffpUnits" data-step="-0.5">-</button>
+              <strong id="ffpUnitsValue">0.0 unit</strong>
+              <button type="button" class="stepper" data-target="ffpUnits" data-step="0.5">+</button>
+            </div>
+          </label>
+
+          <label class="dial-field">
+            <span>已輸晶體液</span>
+            <input id="crystalloidGivenMl" class="dial" type="range" min="0" max="20000" step="50" value="0">
+            <div class="dial-meta">
+              <button type="button" class="stepper" data-target="crystalloidGivenMl" data-step="-100">-</button>
+              <strong id="crystalloidGivenMlValue">0 mL</strong>
+              <button type="button" class="stepper" data-target="crystalloidGivenMl" data-step="100">+</button>
+            </div>
+          </label>
+        </div>
+
+        <div class="section-title assumptions-title">
+          <h2>模型假設</h2>
+          <p>需要時可直接調整</p>
+        </div>
+
+        <div class="field-grid assumptions">
+          <label class="field">
+            <span>PRBC 每單位體積</span>
+            <div class="input-wrap">
+              <input id="prbcUnitVolumeMl" type="number" min="150" max="400" step="10" value="200">
+              <em>mL/unit</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>PRBC Hb content</span>
+            <div class="input-wrap">
+              <input id="prbcHbGramsPerUnit" type="number" min="30" max="80" step="1" value="50">
+              <em>g/unit</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>FFP 每單位體積</span>
+            <div class="input-wrap">
+              <input id="ffpUnitVolumeMl" type="number" min="50" max="300" step="10" value="100">
+              <em>mL/unit</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>估算血量覆寫</span>
+            <div class="input-wrap">
+              <input id="manualBloodVolumeMl" type="number" min="0" max="12000" step="50" value="0">
+              <em>mL</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>未補血 loss 以晶體液替代比</span>
+            <div class="input-wrap">
+              <input id="bloodReplacementRatio" type="number" min="1" max="5" step="0.5" value="1">
+              <em>:1</em>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>晶體液血管內保留率</span>
+            <div class="input-wrap">
+              <input id="crystalloidRetentionFraction" type="number" min="0" max="1" step="0.05" value="0.25">
+              <em>0-1</em>
+            </div>
+          </label>
+        </div>
+      </form>
+
+      <section class="panel panel-results">
+        <div class="section-title">
+          <h2>估算結果</h2>
+          <p>依目前輸入即時更新</p>
+        </div>
+
+        <div class="kpi-grid">
+          <article class="kpi">
+            <span>估算血量 EBV</span>
+            <strong id="estimatedBloodVolume">0 mL</strong>
+          </article>
+          <article class="kpi">
+            <span>最大容許失血 MABL</span>
+            <strong id="estimatedMabl">0 mL</strong>
+          </article>
+          <article class="kpi">
+            <span>目前估算 Hb</span>
+            <strong id="estimatedCurrentHb">0 g/dL</strong>
+          </article>
+          <article class="kpi">
+            <span>還需 PRBC</span>
+            <strong id="neededPrbc">0 unit</strong>
+          </article>
+          <article class="kpi">
+            <span>還需點滴</span>
+            <strong id="neededFluid">0 mL</strong>
+          </article>
+        </div>
+
+        <div class="breakdown">
+          <article>
+            <h3>補液拆解</h3>
+            <dl id="fluidBreakdown"></dl>
+          </article>
+          <article>
+            <h3>Hb mass-balance</h3>
+            <dl id="hbBreakdown"></dl>
+          </article>
+        </div>
+
+        <div class="formula-note">
+          <h3>公式摘要</h3>
+          <ul>
+            <li>EBV 預設用 Janmahasatian lean body weight，再乘以每公斤瘦體重血量：男 105 mL/kg、女 110 mL/kg；若填入覆寫值則改用手動血量。</li>
+            <li>MABL = EBV × (起始 Hb - 目標 Hb) / 起始 Hb。</li>
+            <li>待輸血以「超過 MABL 的失血」為主，再扣掉已輸 PRBC 提供的 Hb。</li>
+            <li>目前 Hb 仍以「起始 Hb mass - 失血帶走的 Hb + 輸血補回的 Hb」除以「目前循環血容量」估算。</li>
+            <li>Hb 稀釋只把部分晶體液視為血管內容量，預設保留率 25%。</li>
+            <li>FFP 視為 colloid，直接算入血管內容量，並一併扣抵待輸液量。</li>
+            <li>點滴需求只把 MABL 內的失血當作晶體液替代目標，再加 maintenance、insensible 與 urine，最後扣掉已輸晶體液與 FFP。</li>
+          </ul>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js");
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "術中輸血與補液估算器",
+  "short_name": "Transfusion Calc",
+  "description": "術中 Hb、MABL、輸血與補液即時計算器",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4efe6",
+  "theme_color": "#b4492e",
+  "lang": "zh-Hant",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
