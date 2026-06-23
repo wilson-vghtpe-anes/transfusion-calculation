@@ -127,16 +127,16 @@ h1 {
 }
 
 .case-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  overflow-x: auto;
   padding-bottom: 6px;
   margin-bottom: 18px;
 }
 
 .case-tab {
   position: relative;
-  min-width: 150px;
+  min-width: 0;
   padding: 14px 54px 14px 14px;
   border-radius: 18px;
   border: 1px solid var(--line);
@@ -149,6 +149,9 @@ h1 {
 .case-tab span,
 .case-tab small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .case-tab small {
@@ -284,6 +287,17 @@ select {
 
 .assumptions-title {
   margin-top: 22px;
+}
+
+.panel-assumptions .assumptions-title {
+  margin-top: 0;
+}
+
+.results-inline {
+  display: block;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
 }
 
 .dial-grid {
@@ -472,7 +486,7 @@ dd {
   }
 
   .case-tab {
-    min-width: 168px;
+    min-width: 0;
     padding-right: 58px;
   }
 

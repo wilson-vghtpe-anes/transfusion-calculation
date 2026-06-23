@@ -2,6 +2,29 @@ const STORAGE_VERSION = 1;
 const STORAGE_KEY = "transfusion-calculation-state-v1";
 const DEFAULT_CASE_NAME = "病人";
 
+function positionLayoutSections() {
+  const form = document.getElementById("calculator");
+  const results = document.querySelector(".panel-results");
+  const assumptionsGrid = document.querySelector(".field-grid.assumptions");
+  const assumptionsTitle = assumptionsGrid?.previousElementSibling;
+  const dialGrid = document.querySelector(".dial-grid");
+
+  if (!form || !results || !assumptionsGrid || !assumptionsTitle || !dialGrid) {
+    return;
+  }
+
+  const assumptionsPanel = document.createElement("section");
+  assumptionsPanel.className = "panel panel-assumptions";
+  assumptionsPanel.append(assumptionsTitle, assumptionsGrid);
+  results.after(assumptionsPanel);
+
+  results.classList.remove("panel");
+  results.classList.add("results-inline");
+  form.insertBefore(results, dialGrid.nextElementSibling);
+}
+
+positionLayoutSections();
+
 const CASE_DEFAULTS = {
   caseName: `${DEFAULT_CASE_NAME} 1`,
   sex: "male",
