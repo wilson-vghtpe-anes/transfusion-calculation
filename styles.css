@@ -229,6 +229,8 @@ select,
 
 input,
 select {
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
@@ -239,7 +241,9 @@ select {
 }
 
 .datetime-input {
+  display: block;
   box-shadow: none;
+  overflow: hidden;
 }
 
 .readonly-card {
@@ -479,10 +483,24 @@ dd {
   }
 
   .datetime-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    max-width: 100%;
     border-radius: 12px;
     border-color: rgba(23, 33, 31, 0.08);
     background: rgba(255, 255, 255, 0.72);
-    padding-right: 10px;
+    padding-left: 10px;
+    padding-right: 6px;
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+
+  .datetime-input::-webkit-date-and-time-value {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: clip;
   }
 
   h1 {
