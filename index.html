@@ -36,12 +36,29 @@
 
     <section class="grid">
       <form id="calculator" class="panel panel-form">
+        <div class="case-toolbar">
+          <div class="section-title compact">
+            <h2>病人分頁</h2>
+            <p>每位病人一個 session，可直接分享同一個網址</p>
+          </div>
+          <div class="case-actions">
+            <button id="addCaseButton" class="action-button" type="button">新增病人</button>
+          </div>
+        </div>
+
+        <div id="caseTabs" class="case-tabs"></div>
+
         <div class="section-title">
           <h2>病人與術中資料</h2>
           <p>輸入數值後即時計算</p>
         </div>
 
         <div class="field-grid">
+          <label class="field field-wide">
+            <span>病人標籤</span>
+            <input id="caseName" type="text" maxlength="40" placeholder="例如 OR2 / Liver Tx / Bed 5">
+          </label>
+
           <label class="field">
             <span>性別</span>
             <select id="sex">
@@ -68,7 +85,7 @@
 
           <label class="field">
             <span>手術開始時間</span>
-            <input id="startTime" type="datetime-local">
+            <input id="startTime" class="datetime-input" type="datetime-local">
           </label>
 
           <label class="field">

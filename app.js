@@ -1,4 +1,56 @@
+const STORAGE_VERSION = 1;
+const DEFAULT_CASE_NAME = "病人";
+
+const CASE_DEFAULTS = {
+  caseName: `${DEFAULT_CASE_NAME} 1`,
+  sex: "male",
+  heightCm: 170,
+  weightKg: 70,
+  surgeryLevel: "4",
+  customInsensible: 4,
+  latestHb: 10,
+  targetHb: 8,
+  bloodLossMl: 800,
+  urineOutputMl: 300,
+  prbcUnits: 0,
+  ffpUnits: 0,
+  crystalloidGivenMl: 0,
+  prbcUnitVolumeMl: 200,
+  prbcHbGramsPerUnit: 50,
+  ffpUnitVolumeMl: 100,
+  manualBloodVolumeMl: 0,
+  bloodReplacementRatio: 1,
+  crystalloidRetentionFraction: 0.25,
+  startTime: ""
+};
+
+const FIELD_IDS = [
+  "caseName",
+  "sex",
+  "heightCm",
+  "weightKg",
+  "startTime",
+  "surgeryLevel",
+  "customInsensible",
+  "latestHb",
+  "targetHb",
+  "bloodLossMl",
+  "urineOutputMl",
+  "prbcUnits",
+  "ffpUnits",
+  "crystalloidGivenMl",
+  "prbcUnitVolumeMl",
+  "prbcHbGramsPerUnit",
+  "ffpUnitVolumeMl",
+  "manualBloodVolumeMl",
+  "bloodReplacementRatio",
+  "crystalloidRetentionFraction"
+];
+
 const elements = {
+  addCaseButton: document.getElementById("addCaseButton"),
+  caseTabs: document.getElementById("caseTabs"),
+  caseName: document.getElementById("caseName"),
   sex: document.getElementById("sex"),
   heightCm: document.getElementById("heightCm"),
   weightKg: document.getElementById("weightKg"),
@@ -33,6 +85,31 @@ const elements = {
   ffpUnitsValue: document.getElementById("ffpUnitsValue"),
   crystalloidGivenMlValue: document.getElementById("crystalloidGivenMlValue")
 };
+
+let appState = loadStateFromHash();
+let activeCaseId = appState.activeCaseId;
+let suppressHashWrite = false;
+
+function createCase(index = 1) {
+  const startTime = defaultStartTimeValue();
+  return {
+    id: `case-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    ...CASE_DEFAULTS,
+    caseName: `${DEFAULT_CASE_NAME} ${index}`,
+    startTime
+  };
+}
+
+function defaultStartTimeValue() {
+  const defaultStart = new Date(Date.now() - (30 * 60000));
+  return toDateTimeLocalValue(defaultStart);
+}
+
+function toDateTimeLocalValue(date) {
+  return new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+    .toISOString()
+    .slice(0, 16);
+}
 
 function readNumber(element, fallback = 0) {
   const value = Number.parseFloat(element.value);
@@ -76,8 +153,7 @@ function currentDurationHours(startTimeValue) {
     return 0;
   }
 
-  const diffMs = Date.now() - start.getTime();
-  return clamp(diffMs / 3600000);
+  return clamp((Date.now() - start.getTime()) / 3600000);
 }
 
 function janmahasatianLbwKg(sex, heightCm, weightKg) {
@@ -129,36 +205,190 @@ function syncDialDisplays() {
   elements.crystalloidGivenMlValue.textContent = formatMl(readNumber(elements.crystalloidGivenMl));
 }
 
+function loadStateFromHash() {
+  if (!window.location.hash.startsWith("#state=")) {
+    const initialCase = createCase(1);
+    return {
+      version: STORAGE_VERSION,
+      activeCaseId: initialCase.id,
+      cases: [initialCase]
+    };
+  }
+
+  try {
+    const encoded = window.location.hash.replace("#state=", "");
+    const json = decodeURIComponent(atob(encoded));
+    const parsed = JSON.parse(json);
+
+    if (!Array.isArray(parsed.cases) || parsed.cases.length === 0) {
+      throw new Error("Invalid cases");
+    }
+
+    const cases = parsed.cases.map((caseData, index) => ({
+      ...CASE_DEFAULTS,
+      ...caseData,
+      id: caseData.id || `case-restored-${index + 1}`,
+      caseName: caseData.caseName || `${DEFAULT_CASE_NAME} ${index + 1}`,
+      startTime: caseData.startTime || defaultStartTimeValue()
+    }));
+
+    const active = cases.some((item) => item.id === parsed.activeCaseId)
+      ? parsed.activeCaseId
+      : cases[0].id;
+
+    return {
+      version: STORAGE_VERSION,
+      activeCaseId: active,
+      cases
+    };
+  } catch (error) {
+    const fallbackCase = createCase(1);
+    return {
+      version: STORAGE_VERSION,
+      activeCaseId: fallbackCase.id,
+      cases: [fallbackCase]
+    };
+  }
+}
+
+function writeStateToHash() {
+  if (suppressHashWrite) {
+    return;
+  }
+
+  const payload = {
+    version: STORAGE_VERSION,
+    activeCaseId,
+    cases: appState.cases
+  };
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  history.replaceState(null, "", `#state=${encoded}`);
+}
+
+function getActiveCase() {
+  return appState.cases.find((item) => item.id === activeCaseId) || appState.cases[0];
+}
+
+function renderCaseTabs() {
+  elements.caseTabs.innerHTML = "";
+
+  appState.cases.forEach((caseData, index) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = `case-tab${caseData.id === activeCaseId ? " is-active" : ""}`;
+    tab.dataset.caseId = caseData.id;
+    tab.innerHTML = `
+      <span>${caseData.caseName || `${DEFAULT_CASE_NAME} ${index + 1}`}</span>
+      <small>${caseData.sex === "female" ? "F" : "M"} · Hb ${Number(caseData.latestHb).toFixed(1)}</small>
+      ${appState.cases.length > 1 ? `<em class="case-close" data-case-id="${caseData.id}">×</em>` : ""}
+    `;
+    elements.caseTabs.appendChild(tab);
+  });
+}
+
+function fillForm(caseData) {
+  FIELD_IDS.forEach((fieldId) => {
+    const element = elements[fieldId];
+    if (!element) {
+      return;
+    }
+    element.value = `${caseData[fieldId] ?? CASE_DEFAULTS[fieldId] ?? ""}`;
+  });
+}
+
+function updateCaseFromForm() {
+  const active = getActiveCase();
+  if (!active) {
+    return;
+  }
+
+  FIELD_IDS.forEach((fieldId) => {
+    const element = elements[fieldId];
+    if (!element) {
+      return;
+    }
+
+    if (element.type === "number" || element.type === "range") {
+      active[fieldId] = readNumber(element, CASE_DEFAULTS[fieldId] ?? 0);
+      return;
+    }
+
+    active[fieldId] = element.value;
+  });
+
+  if (!active.startTime) {
+    active.startTime = defaultStartTimeValue();
+    elements.startTime.value = active.startTime;
+  }
+}
+
+function switchCase(caseId) {
+  const target = appState.cases.find((item) => item.id === caseId);
+  if (!target) {
+    return;
+  }
+
+  activeCaseId = caseId;
+  fillForm(target);
+  renderCaseTabs();
+  calculate();
+}
+
+function addCase() {
+  const newCase = createCase(appState.cases.length + 1);
+  appState.cases.push(newCase);
+  activeCaseId = newCase.id;
+  fillForm(newCase);
+  renderCaseTabs();
+  calculate();
+}
+
+function removeCase(caseId) {
+  if (appState.cases.length <= 1) {
+    return;
+  }
+
+  appState.cases = appState.cases.filter((item) => item.id !== caseId);
+  if (activeCaseId === caseId) {
+    activeCaseId = appState.cases[0].id;
+  }
+  fillForm(getActiveCase());
+  renderCaseTabs();
+  calculate();
+}
+
 function calculate() {
+  updateCaseFromForm();
   syncDialDisplays();
 
-  const durationHr = currentDurationHours(elements.startTime.value);
+  const active = getActiveCase();
+  const durationHr = currentDurationHours(active.startTime);
   elements.currentTimeDisplay.textContent = formatDateTime(new Date());
   elements.durationDisplay.textContent = `經過 ${durationHr.toFixed(1)} hr`;
 
   const input = {
-    sex: elements.sex.value,
-    heightCm: readNumber(elements.heightCm),
-    weightKg: readNumber(elements.weightKg),
+    sex: active.sex,
+    heightCm: Number(active.heightCm),
+    weightKg: Number(active.weightKg),
     durationHr,
-    latestHb: readNumber(elements.latestHb),
-    targetHb: readNumber(elements.targetHb),
-    bloodLossMl: readNumber(elements.bloodLossMl),
-    urineOutputMl: readNumber(elements.urineOutputMl),
-    prbcUnits: readNumber(elements.prbcUnits),
-    ffpUnits: readNumber(elements.ffpUnits),
-    crystalloidGivenMl: readNumber(elements.crystalloidGivenMl),
-    prbcUnitVolumeMl: readNumber(elements.prbcUnitVolumeMl),
-    prbcHbGramsPerUnit: readNumber(elements.prbcHbGramsPerUnit),
-    ffpUnitVolumeMl: readNumber(elements.ffpUnitVolumeMl),
-    manualBloodVolumeMl: readNumber(elements.manualBloodVolumeMl),
-    bloodReplacementRatio: readNumber(elements.bloodReplacementRatio, 1),
-    crystalloidRetentionFraction: readNumber(elements.crystalloidRetentionFraction, 0.25)
+    latestHb: Number(active.latestHb),
+    targetHb: Number(active.targetHb),
+    bloodLossMl: Number(active.bloodLossMl),
+    urineOutputMl: Number(active.urineOutputMl),
+    prbcUnits: Number(active.prbcUnits),
+    ffpUnits: Number(active.ffpUnits),
+    crystalloidGivenMl: Number(active.crystalloidGivenMl),
+    prbcUnitVolumeMl: Number(active.prbcUnitVolumeMl),
+    prbcHbGramsPerUnit: Number(active.prbcHbGramsPerUnit),
+    ffpUnitVolumeMl: Number(active.ffpUnitVolumeMl),
+    manualBloodVolumeMl: Number(active.manualBloodVolumeMl),
+    bloodReplacementRatio: Number(active.bloodReplacementRatio),
+    crystalloidRetentionFraction: Number(active.crystalloidRetentionFraction)
   };
 
-  const insensibleRate = elements.surgeryLevel.value === "custom"
-    ? readNumber(elements.customInsensible)
-    : readNumber(elements.surgeryLevel);
+  const insensibleRate = active.surgeryLevel === "custom"
+    ? Number(active.customInsensible)
+    : Number(active.surgeryLevel);
 
   const ebvMl = estimatedBloodVolumeMl(input);
   const ebvDl = ebvMl / 100;
@@ -176,7 +406,8 @@ function calculate() {
   const crystalloidIntravascularMl = input.crystalloidGivenMl * input.crystalloidRetentionFraction;
   const ffpIntravascularMl = input.ffpUnits * input.ffpUnitVolumeMl;
   const currentCirculatingVolumeMl = clamp(
-    ebvMl - input.bloodLossMl - input.urineOutputMl - (input.weightKg * insensibleRate * input.durationHr) + (input.prbcUnits * input.prbcUnitVolumeMl) + ffpIntravascularMl + crystalloidIntravascularMl,
+    ebvMl - input.bloodLossMl - input.urineOutputMl - (input.weightKg * insensibleRate * input.durationHr)
+      + (input.prbcUnits * input.prbcUnitVolumeMl) + ffpIntravascularMl + crystalloidIntravascularMl,
     ebvMl * 0.25
   );
   const currentHb = currentHbMassGrams / (currentCirculatingVolumeMl / 100);
@@ -224,34 +455,58 @@ function calculate() {
     ["晶體液視為血管內", formatMl(crystalloidIntravascularMl)],
     ["超過 MABL 尚缺 Hb", `${additionalHbNeededGrams.toFixed(1)} g`]
   ]);
+
+  renderCaseTabs();
+  writeStateToHash();
 }
 
-document.querySelectorAll("input, select").forEach((element) => {
-  element.addEventListener("input", calculate);
-  element.addEventListener("change", calculate);
-});
+function bindEvents() {
+  document.querySelectorAll("input, select").forEach((element) => {
+    element.addEventListener("input", calculate);
+    element.addEventListener("change", calculate);
+  });
 
-document.querySelectorAll(".stepper").forEach((button) => {
-  button.addEventListener("click", () => {
-    const target = document.getElementById(button.dataset.target);
-    const step = Number.parseFloat(button.dataset.step);
-    const current = readNumber(target);
-    const min = Number.parseFloat(target.min);
-    const max = Number.parseFloat(target.max);
-    const next = Math.min(max, Math.max(min, current + step));
-    target.value = `${next}`;
+  document.querySelectorAll(".stepper").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = document.getElementById(button.dataset.target);
+      const step = Number.parseFloat(button.dataset.step);
+      const current = readNumber(target);
+      const min = Number.parseFloat(target.min);
+      const max = Number.parseFloat(target.max);
+      const next = Math.min(max, Math.max(min, current + step));
+      target.value = `${next}`;
+      calculate();
+    });
+  });
+
+  elements.addCaseButton.addEventListener("click", addCase);
+
+  elements.caseTabs.addEventListener("click", (event) => {
+    const closeTarget = event.target.closest(".case-close");
+    if (closeTarget) {
+      removeCase(closeTarget.dataset.caseId);
+      return;
+    }
+
+    const tabTarget = event.target.closest(".case-tab");
+    if (tabTarget) {
+      switchCase(tabTarget.dataset.caseId);
+    }
+  });
+
+  window.addEventListener("hashchange", () => {
+    suppressHashWrite = true;
+    appState = loadStateFromHash();
+    activeCaseId = appState.activeCaseId;
+    fillForm(getActiveCase());
+    renderCaseTabs();
+    suppressHashWrite = false;
     calculate();
   });
-});
-
-if (!elements.startTime.value) {
-  const defaultStart = new Date(Date.now() - (4 * 3600000));
-  const local = new Date(defaultStart.getTime() - (defaultStart.getTimezoneOffset() * 60000))
-    .toISOString()
-    .slice(0, 16);
-  elements.startTime.value = local;
 }
 
+bindEvents();
+fillForm(getActiveCase());
+renderCaseTabs();
 setInterval(calculate, 60000);
-
 calculate();
