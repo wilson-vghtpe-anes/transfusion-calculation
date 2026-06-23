@@ -1,4 +1,5 @@
 const STORAGE_VERSION = 1;
+const STORAGE_KEY = "transfusion-calculation-state-v1";
 const DEFAULT_CASE_NAME = "病人";
 
 const CASE_DEFAULTS = {
@@ -86,9 +87,8 @@ const elements = {
   crystalloidGivenMlValue: document.getElementById("crystalloidGivenMlValue")
 };
 
-let appState = loadStateFromHash();
+let appState = loadState();
 let activeCaseId = appState.activeCaseId;
-let suppressHashWrite = false;
 
 function createCase(index = 1) {
   const startTime = defaultStartTimeValue();
@@ -205,64 +205,78 @@ function syncDialDisplays() {
   elements.crystalloidGivenMlValue.textContent = formatMl(readNumber(elements.crystalloidGivenMl));
 }
 
-function loadStateFromHash() {
-  if (!window.location.hash.startsWith("#state=")) {
-    const initialCase = createCase(1);
-    return {
-      version: STORAGE_VERSION,
-      activeCaseId: initialCase.id,
-      cases: [initialCase]
-    };
+function normalizeState(parsed) {
+  if (!Array.isArray(parsed.cases) || parsed.cases.length === 0) {
+    throw new Error("Invalid cases");
   }
 
+  const cases = parsed.cases.map((caseData, index) => ({
+    ...CASE_DEFAULTS,
+    ...caseData,
+    id: caseData.id || `case-restored-${index + 1}`,
+    caseName: caseData.caseName || `${DEFAULT_CASE_NAME} ${index + 1}`,
+    startTime: caseData.startTime || defaultStartTimeValue()
+  }));
+
+  const active = cases.some((item) => item.id === parsed.activeCaseId)
+    ? parsed.activeCaseId
+    : cases[0].id;
+
+  return {
+    version: STORAGE_VERSION,
+    activeCaseId: active,
+    cases
+  };
+}
+
+function createInitialState() {
+  const initialCase = createCase(1);
+  return {
+    version: STORAGE_VERSION,
+    activeCaseId: initialCase.id,
+    cases: [initialCase]
+  };
+}
+
+function loadStateFromHash() {
   try {
     const encoded = window.location.hash.replace("#state=", "");
     const json = decodeURIComponent(atob(encoded));
-    const parsed = JSON.parse(json);
-
-    if (!Array.isArray(parsed.cases) || parsed.cases.length === 0) {
-      throw new Error("Invalid cases");
-    }
-
-    const cases = parsed.cases.map((caseData, index) => ({
-      ...CASE_DEFAULTS,
-      ...caseData,
-      id: caseData.id || `case-restored-${index + 1}`,
-      caseName: caseData.caseName || `${DEFAULT_CASE_NAME} ${index + 1}`,
-      startTime: caseData.startTime || defaultStartTimeValue()
-    }));
-
-    const active = cases.some((item) => item.id === parsed.activeCaseId)
-      ? parsed.activeCaseId
-      : cases[0].id;
-
-    return {
-      version: STORAGE_VERSION,
-      activeCaseId: active,
-      cases
-    };
+    return normalizeState(JSON.parse(json));
   } catch (error) {
-    const fallbackCase = createCase(1);
-    return {
-      version: STORAGE_VERSION,
-      activeCaseId: fallbackCase.id,
-      cases: [fallbackCase]
-    };
+    return null;
   }
 }
 
-function writeStateToHash() {
-  if (suppressHashWrite) {
-    return;
+function loadState() {
+  if (window.location.hash.startsWith("#state=")) {
+    const imported = loadStateFromHash();
+    if (imported) {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      saveState(imported);
+      return imported;
+    }
   }
 
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      return normalizeState(JSON.parse(raw));
+    }
+  } catch (error) {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  return createInitialState();
+}
+
+function saveState(state = appState) {
   const payload = {
     version: STORAGE_VERSION,
-    activeCaseId,
-    cases: appState.cases
+    activeCaseId: state.activeCaseId || activeCaseId,
+    cases: state.cases
   };
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-  history.replaceState(null, "", `#state=${encoded}`);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
 function getActiveCase() {
@@ -329,6 +343,7 @@ function switchCase(caseId) {
   }
 
   activeCaseId = caseId;
+  appState.activeCaseId = activeCaseId;
   fillForm(target);
   renderCaseTabs();
   calculate();
@@ -338,6 +353,7 @@ function addCase() {
   const newCase = createCase(appState.cases.length + 1);
   appState.cases.push(newCase);
   activeCaseId = newCase.id;
+  appState.activeCaseId = activeCaseId;
   fillForm(newCase);
   renderCaseTabs();
   calculate();
@@ -352,6 +368,7 @@ function removeCase(caseId) {
   if (activeCaseId === caseId) {
     activeCaseId = appState.cases[0].id;
   }
+  appState.activeCaseId = activeCaseId;
   fillForm(getActiveCase());
   renderCaseTabs();
   calculate();
@@ -457,7 +474,8 @@ function calculate() {
   ]);
 
   renderCaseTabs();
-  writeStateToHash();
+  appState.activeCaseId = activeCaseId;
+  saveState();
 }
 
 function bindEvents() {
@@ -495,15 +513,6 @@ function bindEvents() {
     }
   });
 
-  window.addEventListener("hashchange", () => {
-    suppressHashWrite = true;
-    appState = loadStateFromHash();
-    activeCaseId = appState.activeCaseId;
-    fillForm(getActiveCase());
-    renderCaseTabs();
-    suppressHashWrite = false;
-    calculate();
-  });
 }
 
 bindEvents();

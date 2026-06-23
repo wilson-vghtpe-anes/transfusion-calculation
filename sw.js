@@ -1,4 +1,4 @@
-const CACHE_NAME = "transfusion-calculation-v1";
+const CACHE_NAME = "transfusion-calculation-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
