@@ -280,7 +280,7 @@ function renderCaseTabs() {
     tab.innerHTML = `
       <span>${caseData.caseName || `${DEFAULT_CASE_NAME} ${index + 1}`}</span>
       <small>${caseData.sex === "female" ? "F" : "M"} · Hb ${Number(caseData.latestHb).toFixed(1)}</small>
-      ${appState.cases.length > 1 ? `<em class="case-close" data-case-id="${caseData.id}">×</em>` : ""}
+      ${appState.cases.length > 1 ? `<button class="case-close" type="button" aria-label="刪除病人" data-case-id="${caseData.id}">×</button>` : ""}
     `;
     elements.caseTabs.appendChild(tab);
   });
@@ -484,6 +484,7 @@ function bindEvents() {
   elements.caseTabs.addEventListener("click", (event) => {
     const closeTarget = event.target.closest(".case-close");
     if (closeTarget) {
+      event.stopPropagation();
       removeCase(closeTarget.dataset.caseId);
       return;
     }
